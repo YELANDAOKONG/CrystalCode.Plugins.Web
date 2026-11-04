@@ -54,6 +54,25 @@ public sealed class WebPluginTests
     }
 
     [Fact]
+    public void ToolsDeclareReadOnlyNetworkApprovalAndTheClassifierMatches()
+    {
+        var store = new WebConfigurationStore(
+            Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"), "web.json"));
+        var contribution = new WebPlugin(store).Contribute();
+        var classifier = Assert.Single(contribution.Classifiers);
+
+        Assert.Equal(["websearch", "webfetch"], contribution.Tools.Select(static tool => tool.Name));
+        foreach (var tool in contribution.Tools)
+        {
+            Assert.True(tool.AutoApprovesReadOnlyNetwork);
+            var call = new Crystal.Tools.ToolCall("1", tool.Name, "{}", Crystal.Tools.ToolInputKind.Json);
+            Assert.True(classifier.TryClassify(call, Path.GetTempPath(), out var classification));
+            Assert.Equal(CrystalCode.Plugins.Approvals.PluginRisk.Read, classification!.Risk);
+            Assert.Equal(CrystalCode.Plugins.Approvals.PluginAuthority.Network, classification.Authority);
+        }
+    }
+
+    [Fact]
     public void CommandOffersEveryProviderAsAnArgumentCompletion()
     {
         var store = new WebConfigurationStore(

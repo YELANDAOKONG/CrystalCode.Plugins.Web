@@ -57,6 +57,10 @@ public sealed class WebPlugin : IPlugin
         public PluginToolCatalogs Catalogs => PluginToolCatalogs.PlanAndWork;
 
         public ITool Tool => tool;
+
+        // The classifier below rates every call Read risk with Network
+        // authority, so Home installs run without a prompt on each search.
+        public bool AutoApprovesReadOnlyNetwork => true;
     }
 
     private sealed class WebCommand(WebConfigurationStore configuration) : IPluginCommand
