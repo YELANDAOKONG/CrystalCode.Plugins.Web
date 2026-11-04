@@ -10,7 +10,7 @@ internal sealed class WebConfigurationStore
     private const string ConfigurationFileName = "web.json";
     private const UnixFileMode OwnerOnly = UnixFileMode.UserRead | UnixFileMode.UserWrite;
 
-    private readonly string _path;
+    private string _path;
 
     public WebConfigurationStore()
         : this(ResolvePath())
@@ -21,6 +21,12 @@ internal sealed class WebConfigurationStore
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         _path = Path.GetFullPath(path);
+    }
+
+    public void AttachHome(string homeDirectory)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(homeDirectory);
+        _path = Path.Combine(Path.GetFullPath(homeDirectory), ConfigurationFileName);
     }
 
     public WebConfiguration Read()

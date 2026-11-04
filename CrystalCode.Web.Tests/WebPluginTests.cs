@@ -1,4 +1,6 @@
 using CrystalCode.Plugins.Commands.Interfaces;
+using CrystalCode.Plugins.Environment;
+using CrystalCode.Plugins.Environment.Interfaces;
 
 using CrystalCode.Web;
 
@@ -19,6 +21,21 @@ public sealed class WebPluginTests
 
         Assert.Equal("tavily", store.Read().Provider);
         Assert.Contains("Web search provider set to tavily.", output.Messages);
+    }
+
+    [Fact]
+    public void UsesHostResolvedHomeDirectoryForConfiguration()
+    {
+        var temporaryDirectory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        var store = new WebConfigurationStore(Path.Combine(temporaryDirectory, "fallback", "web.json"));
+        var plugin = new WebPlugin(store);
+        var command = Assert.Single(plugin.Contribute().Commands);
+        plugin.Attach(new TestPluginEnvironment(temporaryDirectory));
+
+        command.Execute("provider exa", new TestPluginOutput());
+
+        Assert.True(File.Exists(Path.Combine(temporaryDirectory, "web.json")));
+        Assert.False(File.Exists(Path.Combine(temporaryDirectory, "fallback", "web.json")));
     }
 
     [Fact]
@@ -44,5 +61,18 @@ public sealed class WebPluginTests
         public void Write(string text) => Messages.Add(text);
 
         public void Fail(string text) => Errors.Add(text);
+    }
+
+    private sealed class TestPluginEnvironment(string homeDirectory) : IPluginEnvironment
+    {
+        public string HomeDirectory { get; } = homeDirectory;
+
+        public IReadOnlyList<PluginPeer> Plugins => [];
+
+        public IReadOnlyList<ExternalToolSetPeer> ToolSets => [];
+
+        public IReadOnlyList<ExternalToolPeer> ExternalTools => [];
+
+        public IReadOnlyList<SkillPeer> Skills => [];
     }
 }

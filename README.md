@@ -64,7 +64,7 @@ This is a disk plugin for [Crystal Code](https://github.com/YELANDAOKONG/Crystal
 | `CRYSTAL_JINA_MCP_URL` | No | Overrides the Jina endpoint; defaults to `https://mcp.jina.ai/v1` |
 | `CRYSTAL_FIRECRAWL_SEARCH_URL` | No | Overrides the Firecrawl endpoint; defaults to `https://api.firecrawl.dev/v2/search` |
 
-Keyed providers validate their key before sending a request. Jina's `search_web` and Firecrawl's search endpoint both require a key; their free tiers are quota-based rather than anonymous. Provider selection and API keys are read from `~/.crystal/web.json` by default, or `$CRYSTAL_HOME/web.json` when `CRYSTAL_HOME` is set. Environment API-key variables override the stored value. Keep this file private and never commit it.
+Keyed providers validate their key before sending a request. Jina's `search_web` and Firecrawl's search endpoint both require a key; their free tiers are quota-based rather than anonymous. Provider selection and API keys are read from `web.json` under the resolved Crystal Home directory, including any `--home` override. Environment API-key variables override the stored value. Keep this file private and never commit it.
 
 ```json
 {

@@ -79,6 +79,11 @@ public sealed class WebSearchTool : ITool
     {
     }
 
+    internal WebSearchTool(WebConfigurationStore configuration)
+        : this(WebHttp.Shared, Environment.GetEnvironmentVariable, configuration)
+    {
+    }
+
     internal WebSearchTool(
         HttpClient http,
         Func<string, string?> environment,

@@ -2,6 +2,7 @@ using CrystalCode.Plugins;
 using CrystalCode.Plugins.Approvals;
 using CrystalCode.Plugins.Approvals.Interfaces;
 using CrystalCode.Plugins.Commands.Interfaces;
+using CrystalCode.Plugins.Environment.Interfaces;
 using CrystalCode.Plugins.Interfaces;
 using CrystalCode.Plugins.Tools;
 using CrystalCode.Plugins.Tools.Interfaces;
@@ -30,10 +31,19 @@ public sealed class WebPlugin : IPlugin
 
     public string Name => "Crystal Code Web";
 
+    public void Attach(IPluginEnvironment environment)
+    {
+        ArgumentNullException.ThrowIfNull(environment);
+        if (!string.IsNullOrWhiteSpace(environment.HomeDirectory))
+        {
+            _configuration.AttachHome(environment.HomeDirectory);
+        }
+    }
+
     public PluginContribution Contribute() => new(
         tools:
         [
-            new WebPluginTool(new WebSearchTool()),
+            new WebPluginTool(new WebSearchTool(_configuration)),
             new WebPluginTool(new WebFetchTool())
         ],
         commands: [new WebCommand(_configuration)],
