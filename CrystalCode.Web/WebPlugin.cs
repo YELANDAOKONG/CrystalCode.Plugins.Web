@@ -1,6 +1,7 @@
 using CrystalCode.Plugins;
 using CrystalCode.Plugins.Approvals;
 using CrystalCode.Plugins.Approvals.Interfaces;
+using CrystalCode.Plugins.Commands;
 using CrystalCode.Plugins.Commands.Interfaces;
 using CrystalCode.Plugins.Environment.Interfaces;
 using CrystalCode.Plugins.Interfaces;
@@ -63,6 +64,18 @@ public sealed class WebPlugin : IPlugin
         public string Name => "web";
 
         public string Help => "/web [provider <name>] - show or change the Web search provider";
+
+        public IReadOnlyList<PluginCommandArgument> Arguments { get; } =
+        [
+            new PluginCommandArgument(
+                "provider",
+                "Show or change the Web search provider",
+                arguments: SearchProviders.All.Select(static definition => new PluginCommandArgument(
+                    definition.Name,
+                    definition.RequiresKey
+                        ? $"{definition.Title} (API key required)"
+                        : $"{definition.Title} (works without a key)"))),
+        ];
 
         public void Execute(string argument, IPluginOutput output)
         {
