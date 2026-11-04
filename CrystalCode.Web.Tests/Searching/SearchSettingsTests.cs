@@ -7,7 +7,7 @@ public sealed class SearchSettingsTests
     [Fact]
     public void ResolvesParallelDefaults()
     {
-        var settings = SearchSettings.Resolve(SearchProvider.Parallel, TestEnvironment.Empty);
+        var settings = SearchSettings.Resolve(SearchProvider.Parallel, null, TestEnvironment.Empty);
 
         Assert.Equal("https://search.parallel.ai/mcp", settings.Endpoint.ToString());
         Assert.Null(settings.ApiKey);
@@ -16,7 +16,7 @@ public sealed class SearchSettingsTests
     [Fact]
     public void ResolvesExaDefaults()
     {
-        var settings = SearchSettings.Resolve(SearchProvider.Exa, TestEnvironment.Empty);
+        var settings = SearchSettings.Resolve(SearchProvider.Exa, null, TestEnvironment.Empty);
 
         Assert.Equal("https://mcp.exa.ai/mcp", settings.Endpoint.ToString());
         Assert.Null(settings.ApiKey);
@@ -29,7 +29,7 @@ public sealed class SearchSettingsTests
             ("CRYSTAL_EXA_MCP_URL", "http://localhost:1234/mcp"),
             ("EXA_API_KEY", "  secret  "));
 
-        var settings = SearchSettings.Resolve(SearchProvider.Exa, environment);
+        var settings = SearchSettings.Resolve(SearchProvider.Exa, null, environment);
 
         Assert.Equal("http://localhost:1234/mcp", settings.Endpoint.ToString());
         Assert.Equal("secret", settings.ApiKey);
@@ -40,7 +40,7 @@ public sealed class SearchSettingsTests
     {
         var environment = TestEnvironment.From(("CRYSTAL_PARALLEL_MCP_URL", "   "));
 
-        var settings = SearchSettings.Resolve(SearchProvider.Parallel, environment);
+        var settings = SearchSettings.Resolve(SearchProvider.Parallel, null, environment);
 
         Assert.Equal("https://search.parallel.ai/mcp", settings.Endpoint.ToString());
     }
@@ -51,7 +51,7 @@ public sealed class SearchSettingsTests
         var environment = TestEnvironment.From(("CRYSTAL_EXA_MCP_URL", "not a url"));
 
         var exception = Assert.Throws<WebToolException>(
-            () => SearchSettings.Resolve(SearchProvider.Exa, environment));
+            () => SearchSettings.Resolve(SearchProvider.Exa, null, environment));
 
         Assert.Equal(
             "Environment variable CRYSTAL_EXA_MCP_URL must be an absolute http or https URL.",
@@ -87,7 +87,7 @@ public sealed class SearchSettingsTests
         Assert.True(SearchProviders.TryParse(providerName, out var provider));
         var environment = TestEnvironment.From((keyVariable, "  secret  "));
 
-        var settings = SearchSettings.Resolve(provider, environment);
+        var settings = SearchSettings.Resolve(provider, "stored-secret", environment);
 
         Assert.Equal(endpoint, settings.Endpoint.ToString());
         Assert.Equal("secret", settings.ApiKey);
@@ -106,10 +106,10 @@ public sealed class SearchSettingsTests
     {
         Assert.True(SearchProviders.TryParse(providerName, out var provider));
         var exception = Assert.Throws<WebToolException>(
-            () => SearchSettings.Resolve(provider, TestEnvironment.Empty));
+            () => SearchSettings.Resolve(provider, null, TestEnvironment.Empty));
 
         Assert.Equal(
-            $"Environment variable {keyVariable} is required for {SearchProviders.Title(provider)} search.",
+            $"An API key is required for {SearchProviders.Title(provider)} search. Set {keyVariable} or add the key to web.json.",
             exception.Message);
     }
 
@@ -120,8 +120,26 @@ public sealed class SearchSettingsTests
             ("CRYSTAL_TAVILY_SEARCH_URL", "http://localhost:1234/search"),
             ("TAVILY_API_KEY", "secret"));
 
-        var settings = SearchSettings.Resolve(SearchProvider.Tavily, environment);
+        var settings = SearchSettings.Resolve(SearchProvider.Tavily, null, environment);
 
         Assert.Equal("http://localhost:1234/search", settings.Endpoint.ToString());
+    }
+
+    [Fact]
+    public void EnvironmentKeyOverridesStoredKey()
+    {
+        var environment = TestEnvironment.From(("TAVILY_API_KEY", "environment-secret"));
+
+        var settings = SearchSettings.Resolve(SearchProvider.Tavily, "file-secret", environment);
+
+        Assert.Equal("environment-secret", settings.ApiKey);
+    }
+
+    [Fact]
+    public void UsesStoredKeyWhenEnvironmentKeyIsMissing()
+    {
+        var settings = SearchSettings.Resolve(SearchProvider.Tavily, "file-secret", TestEnvironment.Empty);
+
+        Assert.Equal("file-secret", settings.ApiKey);
     }
 }

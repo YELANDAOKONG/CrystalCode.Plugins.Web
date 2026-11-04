@@ -28,7 +28,7 @@ public sealed class WebSearchToolTests
     public async Task RejectsInvalidArguments()
     {
         using var http = new HttpClient(new FakeHttpMessageHandler());
-        var tool = new WebSearchTool(http, TestEnvironment.Empty);
+        var tool = CreateTool(http, TestEnvironment.Empty);
 
         var output = await tool.InvokeAsync(
             new ToolCall("1", "websearch", "{}", ToolInputKind.Json));
@@ -45,7 +45,7 @@ public sealed class WebSearchToolTests
             {"result":{"content":[{"type":"text","text":"found it"}]}}
             """);
         using var http = new HttpClient(handler);
-        var tool = new WebSearchTool(http, TestEnvironment.Empty);
+        var tool = CreateTool(http, TestEnvironment.Empty);
 
         var output = await tool.InvokeAsync(
             new ToolCall("1", "websearch", """{"query":"crystal"}""", ToolInputKind.Json));
@@ -60,7 +60,7 @@ public sealed class WebSearchToolTests
         var handler = new FakeHttpMessageHandler().Respond(
             _ => TestResponses.Status(HttpStatusCode.InternalServerError));
         using var http = new HttpClient(handler);
-        var tool = new WebSearchTool(http, TestEnvironment.Empty);
+        var tool = CreateTool(http, TestEnvironment.Empty);
 
         var output = await tool.InvokeAsync(
             new ToolCall("1", "websearch", """{"query":"crystal"}""", ToolInputKind.Json));
@@ -74,15 +74,21 @@ public sealed class WebSearchToolTests
     {
         var handler = new FakeHttpMessageHandler();
         using var http = new HttpClient(handler);
-        var environment = TestEnvironment.From(
-            (SearchArguments.ProviderVariable, "tavily"));
-        var tool = new WebSearchTool(http, environment);
+        var environment = TestEnvironment.Empty;
+        var configuration = new WebConfigurationStore(
+            Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"), "web.json"));
+        configuration.Write(new WebConfiguration("tavily", new Dictionary<string, string>()));
+        var tool = new WebSearchTool(http, environment, configuration);
 
         var output = await tool.InvokeAsync(
             new ToolCall("1", "websearch", """{"query":"crystal"}""", ToolInputKind.Json));
 
         Assert.Equal(ToolResultStatus.Failure, output.Status);
-        Assert.Equal("Environment variable TAVILY_API_KEY is required for Tavily search.", output.Text);
+        Assert.Equal("An API key is required for Tavily search. Set TAVILY_API_KEY or add the key to web.json.", output.Text);
         Assert.Empty(handler.Requests);
     }
+
+    private static WebSearchTool CreateTool(HttpClient http, Func<string, string?> environment) =>
+        new(http, environment, new WebConfigurationStore(
+            Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"), "web.json")));
 }

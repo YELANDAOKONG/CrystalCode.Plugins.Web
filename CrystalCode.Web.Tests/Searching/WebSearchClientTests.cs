@@ -98,11 +98,9 @@ public sealed class WebSearchClientTests
     public async Task AddsAnExaKeyHeaderAndUsesTheExaEndpoint()
     {
         var handler = new FakeHttpMessageHandler().Respond(FoundBody);
-        var environment = TestEnvironment.From(
-            (SearchArguments.ProviderVariable, "exa"),
-            ("EXA_API_KEY", "secret"));
+        var environment = TestEnvironment.From(("EXA_API_KEY", "secret"));
 
-        await SearchAsync(handler, """{"query":"crystal"}""", environment);
+        await SearchAsync(handler, SearchProvider.Exa, """{"query":"crystal"}""", environment);
 
         var request = handler.Requests[0];
         Assert.Equal("https://mcp.exa.ai/mcp", request.Uri!.ToString());
@@ -172,12 +170,11 @@ public sealed class WebSearchClientTests
     {
         var handler = new FakeHttpMessageHandler().Respond(
             """{"results":[{"title":"Example","url":"https://example.com","content":"hello"}]}""");
-        var environment = TestEnvironment.From(
-            (SearchArguments.ProviderVariable, "tavily"),
-            ("TAVILY_API_KEY", "secret"));
+        var environment = TestEnvironment.From(("TAVILY_API_KEY", "secret"));
 
         var text = await SearchAsync(
             handler,
+            SearchProvider.Tavily,
             """{"query":"crystal","type":"deep","numResults":5}""",
             environment);
 
@@ -202,12 +199,10 @@ public sealed class WebSearchClientTests
     public async Task ReportsInvalidJsonFromARestProvider()
     {
         var handler = new FakeHttpMessageHandler().Respond("not json");
-        var environment = TestEnvironment.From(
-            (SearchArguments.ProviderVariable, "tavily"),
-            ("TAVILY_API_KEY", "secret"));
+        var environment = TestEnvironment.From(("TAVILY_API_KEY", "secret"));
 
         var exception = await Assert.ThrowsAsync<WebToolException>(
-            () => SearchAsync(handler, """{"query":"crystal"}""", environment));
+            () => SearchAsync(handler, SearchProvider.Tavily, """{"query":"crystal"}""", environment));
 
         Assert.Equal("The search provider returned an invalid JSON response.", exception.Message);
     }
@@ -221,11 +216,9 @@ public sealed class WebSearchClientTests
               {"name":"Example","url":"https://example.com","summary":"hello","siteName":"Example"}
             ]}}}
             """);
-        var environment = TestEnvironment.From(
-            (SearchArguments.ProviderVariable, "bocha"),
-            ("BOCHA_API_KEY", "secret"));
+        var environment = TestEnvironment.From(("BOCHA_API_KEY", "secret"));
 
-        var text = await SearchAsync(handler, """{"query":"crystal"}""", environment);
+        var text = await SearchAsync(handler, SearchProvider.Bocha, """{"query":"crystal"}""", environment);
 
         var request = Assert.Single(handler.Requests);
         Assert.Equal("https://api.bocha.cn/v1/web-search", request.Uri!.ToString());
@@ -249,11 +242,9 @@ public sealed class WebSearchClientTests
     {
         var handler = new FakeHttpMessageHandler().Respond(
             """{"results":[{"title":"Example","url":"https://example.com","snippet":"hello"}],"id":"x"}""");
-        var environment = TestEnvironment.From(
-            (SearchArguments.ProviderVariable, "perplexity"),
-            ("PERPLEXITY_API_KEY", "secret"));
+        var environment = TestEnvironment.From(("PERPLEXITY_API_KEY", "secret"));
 
-        var text = await SearchAsync(handler, """{"query":"crystal","type":"fast"}""", environment);
+        var text = await SearchAsync(handler, SearchProvider.Perplexity, """{"query":"crystal","type":"fast"}""", environment);
 
         var request = Assert.Single(handler.Requests);
         Assert.Equal("https://api.perplexity.ai/search", request.Uri!.ToString());
@@ -277,11 +268,9 @@ public sealed class WebSearchClientTests
             """
             {"result":{"content":[{"type":"text","text":"title: Example\nurl: https://example.com"}]}}
             """);
-        var environment = TestEnvironment.From(
-            (SearchArguments.ProviderVariable, "jina"),
-            ("JINA_API_KEY", "secret"));
+        var environment = TestEnvironment.From(("JINA_API_KEY", "secret"));
 
-        var text = await SearchAsync(handler, """{"query":"crystal"}""", environment);
+        var text = await SearchAsync(handler, SearchProvider.Jina, """{"query":"crystal"}""", environment);
 
         var request = Assert.Single(handler.Requests);
         Assert.Equal("https://mcp.jina.ai/v1", request.Uri!.ToString());
@@ -296,11 +285,9 @@ public sealed class WebSearchClientTests
     {
         var handler = new FakeHttpMessageHandler().Respond(
             """{"success":true,"data":{"web":[{"title":"Example","url":"https://example.com","description":"hello"}]}}""");
-        var environment = TestEnvironment.From(
-            (SearchArguments.ProviderVariable, "firecrawl"),
-            ("FIRECRAWL_API_KEY", "secret"));
+        var environment = TestEnvironment.From(("FIRECRAWL_API_KEY", "secret"));
 
-        var text = await SearchAsync(handler, """{"query":"crystal"}""", environment);
+        var text = await SearchAsync(handler, SearchProvider.Firecrawl, """{"query":"crystal"}""", environment);
 
         var request = Assert.Single(handler.Requests);
         Assert.Equal("https://api.firecrawl.dev/v2/search", request.Uri!.ToString());
@@ -320,11 +307,18 @@ public sealed class WebSearchClientTests
     private static async Task<string> SearchAsync(
         FakeHttpMessageHandler handler,
         string argumentsJson,
+        Func<string, string?>? environment = null) =>
+        await SearchAsync(handler, SearchProvider.Parallel, argumentsJson, environment);
+
+    private static async Task<string> SearchAsync(
+        FakeHttpMessageHandler handler,
+        SearchProvider provider,
+        string argumentsJson,
         Func<string, string?>? environment = null)
     {
         var lookup = environment ?? TestEnvironment.Empty;
-        Assert.True(SearchArguments.TryRead(argumentsJson, lookup, out var request, out var error), error);
-        var settings = SearchSettings.Resolve(request.Provider, lookup);
+        Assert.True(SearchArguments.TryRead(argumentsJson, provider, out var request, out var error), error);
+        var settings = SearchSettings.Resolve(request.Provider, null, lookup);
         using var http = new HttpClient(handler);
         return await WebSearchClient.SearchAsync(http, settings, request, CancellationToken.None);
     }

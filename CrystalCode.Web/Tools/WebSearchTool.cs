@@ -69,21 +69,27 @@ public sealed class WebSearchTool : ITool
 
     private readonly HttpClient _http;
     private readonly Func<string, string?> _environment;
+    private readonly WebConfigurationStore _configuration;
 
     /// <summary>
     /// Initializes the tool with the shared HTTP client and the process environment.
     /// </summary>
     public WebSearchTool()
-        : this(WebHttp.Shared, Environment.GetEnvironmentVariable)
+        : this(WebHttp.Shared, Environment.GetEnvironmentVariable, new WebConfigurationStore())
     {
     }
 
-    internal WebSearchTool(HttpClient http, Func<string, string?> environment)
+    internal WebSearchTool(
+        HttpClient http,
+        Func<string, string?> environment,
+        WebConfigurationStore configuration)
     {
         ArgumentNullException.ThrowIfNull(http);
         ArgumentNullException.ThrowIfNull(environment);
+        ArgumentNullException.ThrowIfNull(configuration);
         _http = http;
         _environment = environment;
+        _configuration = configuration;
     }
 
     /// <inheritdoc />
@@ -95,14 +101,23 @@ public sealed class WebSearchTool : ITool
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(call);
-        if (!SearchArguments.TryRead(call.Arguments, _environment, out var request, out var error))
+        var configuration = _configuration.Read();
+        if (!SearchProviders.TryParse(configuration.Provider, out var provider))
+        {
+            provider = SearchProvider.Parallel;
+        }
+
+        if (!SearchArguments.TryRead(call.Arguments, provider, out var request, out var error))
         {
             return WebToolResult.Failure(error ?? "Tool arguments are not valid.");
         }
 
         try
         {
-            var settings = SearchSettings.Resolve(request.Provider, _environment);
+            var settings = SearchSettings.Resolve(
+                request.Provider,
+                configuration.ApiKeys.GetValueOrDefault(SearchProviders.Get(request.Provider).Name),
+                _environment);
             var text = await WebSearchClient
                 .SearchAsync(_http, settings, request, cancellationToken)
                 .ConfigureAwait(false);

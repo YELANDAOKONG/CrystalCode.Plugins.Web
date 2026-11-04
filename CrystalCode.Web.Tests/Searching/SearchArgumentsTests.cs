@@ -9,7 +9,7 @@ public sealed class SearchArgumentsTests
     {
         var json = """{"query":"crystal code"}""";
 
-        Assert.True(SearchArguments.TryRead(json, TestEnvironment.Empty, out var request, out var error), error);
+        Assert.True(SearchArguments.TryRead(json, SearchProvider.Parallel, out var request, out var error), error);
         Assert.Equal("crystal code", request.Query);
         Assert.Equal(SearchProvider.Parallel, request.Provider);
         Assert.Equal(8, request.NumResults);
@@ -37,7 +37,7 @@ public sealed class SearchArgumentsTests
             }
             """;
 
-        Assert.True(SearchArguments.TryRead(json, TestEnvironment.Empty, out var request, out var error), error);
+        Assert.True(SearchArguments.TryRead(json, SearchProvider.Exa, out var request, out var error), error);
         Assert.Equal("crystal code", request.Query);
         Assert.Equal(12, request.NumResults);
         Assert.Equal(2500, request.ContextMaxCharacters);
@@ -48,42 +48,10 @@ public sealed class SearchArgumentsTests
         Assert.Equal(4000, request.MaxCharacters);
     }
 
-    [Theory]
-    [InlineData("exa")]
-    [InlineData("EXA")]
-    [InlineData("parallel")]
-    [InlineData("tavily")]
-    [InlineData("bocha")]
-    [InlineData("perplexity")]
-    [InlineData("jina")]
-    [InlineData("firecrawl")]
-    public void ReadsTheProviderFromTheEnvironment(string configured)
-    {
-        var environment = TestEnvironment.From((SearchArguments.ProviderVariable, configured));
-
-        Assert.True(
-            SearchArguments.TryRead("""{"query":"x"}""", environment, out var request, out var error),
-            error);
-        Assert.True(SearchProviders.TryParse(configured, out var expected));
-        Assert.Equal(expected, request.Provider);
-    }
-
-    [Fact]
-    public void RejectsAnUnknownProviderInTheEnvironment()
-    {
-        var environment = TestEnvironment.From((SearchArguments.ProviderVariable, "comet"));
-
-        Assert.False(
-            SearchArguments.TryRead("""{"query":"x"}""", environment, out _, out var error));
-        Assert.Equal(
-            "Provider must be 'parallel', 'exa', 'tavily', 'bocha', 'perplexity', 'jina', or 'firecrawl'.",
-            error);
-    }
-
     [Fact]
     public void RejectsAMissingQuery()
     {
-        Assert.False(SearchArguments.TryRead("{}", TestEnvironment.Empty, out _, out var error));
+        Assert.False(SearchArguments.TryRead("{}", SearchProvider.Parallel, out _, out var error));
         Assert.Equal("Argument 'query' must be a non-empty string.", error);
     }
 
@@ -93,7 +61,7 @@ public sealed class SearchArgumentsTests
         Assert.False(
             SearchArguments.TryRead(
                 """{"query":"x","limit":5}""",
-                TestEnvironment.Empty,
+                SearchProvider.Parallel,
                 out _,
                 out var error));
         Assert.Equal(
@@ -109,7 +77,7 @@ public sealed class SearchArgumentsTests
     {
         var json = $$"""{"query":"x","numResults":{{value}}}""";
 
-        Assert.False(SearchArguments.TryRead(json, TestEnvironment.Empty, out _, out var error));
+        Assert.False(SearchArguments.TryRead(json, SearchProvider.Parallel, out _, out var error));
         Assert.Equal("Argument 'numResults' must be an integer between 1 and 20.", error);
     }
 
@@ -119,7 +87,7 @@ public sealed class SearchArgumentsTests
         Assert.False(
             SearchArguments.TryRead(
                 """{"query":"x","type":"slow"}""",
-                TestEnvironment.Empty,
+                SearchProvider.Parallel,
                 out _,
                 out var error));
         Assert.Equal("Argument 'type' must be 'auto', 'fast', or 'deep'.", error);
@@ -131,7 +99,7 @@ public sealed class SearchArgumentsTests
         Assert.False(
             SearchArguments.TryRead(
                 """{"query":"x","livecrawl":"always"}""",
-                TestEnvironment.Empty,
+                SearchProvider.Parallel,
                 out _,
                 out var error));
         Assert.Equal("Argument 'livecrawl' must be 'fallback' or 'preferred'.", error);
@@ -143,7 +111,7 @@ public sealed class SearchArgumentsTests
         Assert.False(
             SearchArguments.TryRead(
                 """{"query":"x","session_id":5}""",
-                TestEnvironment.Empty,
+                SearchProvider.Parallel,
                 out _,
                 out var error));
         Assert.Equal("Argument 'session_id' must be a string.", error);
@@ -155,7 +123,7 @@ public sealed class SearchArgumentsTests
         Assert.False(
             SearchArguments.TryRead(
                 """{"query":"x","maxCharacters":100001}""",
-                TestEnvironment.Empty,
+                SearchProvider.Parallel,
                 out _,
                 out var error));
         Assert.Equal("Argument 'maxCharacters' must be an integer between 1 and 100000.", error);
@@ -166,7 +134,7 @@ public sealed class SearchArgumentsTests
     {
         var json = """{"query":"x","type":null,"session_id":null,"maxCharacters":null}""";
 
-        Assert.True(SearchArguments.TryRead(json, TestEnvironment.Empty, out var request, out var error), error);
+        Assert.True(SearchArguments.TryRead(json, SearchProvider.Parallel, out var request, out var error), error);
         Assert.Equal("auto", request.Type);
         Assert.Null(request.SessionId);
         Assert.Null(request.MaxCharacters);
@@ -175,14 +143,14 @@ public sealed class SearchArgumentsTests
     [Fact]
     public void RejectsArgumentsThatAreNotAnObject()
     {
-        Assert.False(SearchArguments.TryRead("[]", TestEnvironment.Empty, out _, out var error));
+        Assert.False(SearchArguments.TryRead("[]", SearchProvider.Parallel, out _, out var error));
         Assert.Equal("Tool arguments must be a JSON object.", error);
     }
 
     [Fact]
     public void RejectsMalformedJson()
     {
-        Assert.False(SearchArguments.TryRead("{", TestEnvironment.Empty, out _, out var error));
+        Assert.False(SearchArguments.TryRead("{", SearchProvider.Parallel, out _, out var error));
         Assert.Equal("Tool arguments are not valid JSON.", error);
     }
 }

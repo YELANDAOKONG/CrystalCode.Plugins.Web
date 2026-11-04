@@ -8,10 +8,11 @@
 
     <ItemGroup>
         <ProjectReference Include="../../Crystal/Crystal.Tools/Crystal.Tools.csproj" />
+        <ProjectReference Include="../../CrystalCode/CrystalCode.Plugins/CrystalCode.Plugins.csproj" />
     </ItemGroup>
 
     <ItemGroup>
-        <Content Include="..\tools.json" Link="tools.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+        <Content Include="..\plugin.json" Link="plugin.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     </ItemGroup>
 
     <ItemGroup>

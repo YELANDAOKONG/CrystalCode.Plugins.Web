@@ -11,6 +11,7 @@ internal sealed record SearchSettings(
 {
     public static SearchSettings Resolve(
         SearchProvider provider,
+        string? storedApiKey,
         Func<string, string?> environment)
     {
         ArgumentNullException.ThrowIfNull(environment);
@@ -27,10 +28,14 @@ internal sealed record SearchSettings(
         }
 
         var key = environment(definition.KeyVariable);
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            key = storedApiKey;
+        }
         if (definition.RequiresKey && string.IsNullOrWhiteSpace(key))
         {
             throw new WebToolException(
-                $"Environment variable {definition.KeyVariable} is required for {definition.Title} search.");
+                $"An API key is required for {definition.Title} search. Set {definition.KeyVariable} or add the key to web.json.");
         }
 
         return new SearchSettings(

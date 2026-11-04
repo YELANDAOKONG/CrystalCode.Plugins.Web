@@ -9,8 +9,6 @@ namespace CrystalCode.Web.Searching;
 /// </summary>
 internal static class SearchArguments
 {
-    public const string ProviderVariable = "CRYSTAL_WEBSEARCH_PROVIDER";
-
     private static readonly string[] AllowedProperties =
     [
         "query",
@@ -28,11 +26,10 @@ internal static class SearchArguments
 
     public static bool TryRead(
         string json,
-        Func<string, string?> environment,
+        SearchProvider provider,
         out SearchRequest request,
         out string? error)
     {
-        ArgumentNullException.ThrowIfNull(environment);
         request = null!;
         if (!WebArguments.TryOpen(json, out var root, out var document, out error))
         {
@@ -43,7 +40,6 @@ internal static class SearchArguments
         {
             if (!WebArguments.TryRejectUnknown(root, AllowedProperties, out error)
                 || !WebArguments.TryReadRequiredString(root, "query", out var query, out error)
-                || !TryReadProvider(environment, out var provider, out error)
                 || !WebArguments.TryReadBoundedInt(
                     root,
                     "numResults",
@@ -86,25 +82,4 @@ internal static class SearchArguments
         }
     }
 
-    private static bool TryReadProvider(
-        Func<string, string?> environment,
-        out SearchProvider provider,
-        out string? error)
-    {
-        error = null;
-        var configured = environment(ProviderVariable);
-        if (string.IsNullOrWhiteSpace(configured))
-        {
-            provider = SearchProvider.Parallel;
-            return true;
-        }
-
-        if (SearchProviders.TryParse(configured.Trim(), out provider))
-        {
-            return true;
-        }
-
-        error = $"Provider must be {SearchProviders.DescribeChoices()}.";
-        return false;
-    }
 }
