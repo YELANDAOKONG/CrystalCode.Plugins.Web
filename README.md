@@ -88,7 +88,7 @@ Restart the session, or run `/plugins reload`, to load the plugin. A project plu
 
 ## Build from source
 
-You need the .NET 10 SDK, a sibling checkout of [Crystal](https://github.com/YELANDAOKONG/Crystal) at `../Crystal`, and a CrystalCode checkout at `../CrystalCode` for the plugin contract project reference.
+You need the .NET 11 SDK, a sibling checkout of [Crystal](https://github.com/YELANDAOKONG/Crystal) at `../Crystal`, and a CrystalCode checkout at `../CrystalCode` for the plugin contract project reference.
 
 ```bash
 dotnet build CrystalCode.Web.sln

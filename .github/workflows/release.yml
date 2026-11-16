@@ -1,0 +1,172 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - release
+  release:
+    types:
+      - published
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to build and upload
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    name: ${{ matrix.artifact }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            rid: win-x64
+            artifact: windows-x64
+          - os: ubuntu-latest
+            rid: linux-x64
+            artifact: linux-x64
+          - os: ubuntu-24.04-arm
+            rid: linux-arm64
+            artifact: linux-arm64
+          - os: macos-latest
+            rid: osx-arm64
+            artifact: macos-arm64
+          - os: macos-15-intel
+            rid: osx-x64
+            artifact: macos-x64
+          - os: windows-11-arm
+            rid: win-arm64
+            artifact: windows-arm64
+          # GitHub has no musl runners. These jobs run in the Alpine SDK image.
+          - os: ubuntu-latest
+            rid: linux-musl-x64
+            artifact: linux-musl-x64
+            musl: true
+          - os: ubuntu-24.04-arm
+            rid: linux-musl-arm64
+            artifact: linux-musl-arm64
+            musl: true
+
+    steps:
+      # Sibling layout matches project references: ../../Crystal/... and
+      # ../../CrystalCode/...
+      - name: Checkout CrystalCode.Tools.Web
+        uses: actions/checkout@v4
+        with:
+          path: CrystalCode.Tools.Web
+          ref: ${{ github.event.release.tag_name || inputs.tag || github.sha }}
+
+      - name: Checkout Crystal
+        uses: actions/checkout@v4
+        with:
+          repository: YELANDAOKONG/Crystal
+          path: Crystal
+
+      - name: Checkout CrystalCode
+        uses: actions/checkout@v4
+        with:
+          repository: YELANDAOKONG/CrystalCode
+          path: CrystalCode
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "11.0.x"
+
+      - name: Restore
+        if: ${{ !matrix.musl }}
+        working-directory: CrystalCode.Tools.Web
+        run: dotnet restore CrystalCode.Web.sln
+
+      - name: Test
+        if: ${{ !matrix.musl }}
+        working-directory: CrystalCode.Tools.Web
+        run: dotnet test CrystalCode.Web.sln --configuration Release --no-restore
+
+      # The host loads the plugin into its own runtime, so the plugin is
+      # framework-dependent and is not published as a single file.
+      - name: Publish
+        if: ${{ !matrix.musl }}
+        working-directory: CrystalCode.Tools.Web
+        run: >
+          dotnet publish CrystalCode.Web/CrystalCode.Web.csproj
+          --configuration Release
+          --runtime ${{ matrix.rid }}
+          --self-contained false
+          --output ./publish
+
+      - name: Test and publish (Alpine)
+        if: ${{ matrix.musl }}
+        run: >
+          docker run --rm
+          --volume "$GITHUB_WORKSPACE:/work"
+          --workdir /work/CrystalCode.Tools.Web
+          mcr.microsoft.com/dotnet/sdk:11.0-alpine
+          sh -euc 'dotnet restore CrystalCode.Web.sln &&
+          dotnet test CrystalCode.Web.sln --configuration Release --no-restore &&
+          dotnet publish CrystalCode.Web/CrystalCode.Web.csproj
+          --configuration Release
+          --runtime ${{ matrix.rid }}
+          --self-contained false
+          --output ./publish'
+
+      - name: Archive published plugin
+        if: runner.os != 'Windows'
+        working-directory: CrystalCode.Tools.Web
+        run: >
+          zip -q -r CrystalCode.Web-${{ matrix.artifact }}.zip publish
+
+      - name: Archive published plugin
+        if: runner.os == 'Windows'
+        working-directory: CrystalCode.Tools.Web
+        run: >
+          Compress-Archive -Path .\publish\* -DestinationPath
+          CrystalCode.Web-${{ matrix.artifact }}.zip
+
+      - name: Upload release asset
+        if: github.event_name != 'push'
+        working-directory: CrystalCode.Tools.Web
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release upload ${{ github.event.release.tag_name || inputs.tag }}
+          CrystalCode.Web-${{ matrix.artifact }}.zip
+          --clobber
+
+      - name: Upload build artifact
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: CrystalCode.Web-${{ matrix.artifact }}
+          path: CrystalCode.Tools.Web/publish
+          if-no-files-found: error
+
+  checksum:
+    name: checksum.txt
+    needs: publish
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+    steps:
+      - name: Download release archives
+        run: >
+          gh release download "$TAG"
+          --repo "$GITHUB_REPOSITORY"
+          --pattern 'CrystalCode.Web-*.zip'
+          --dir assets
+
+      - name: Write checksum.txt
+        working-directory: assets
+        run: sha256sum CrystalCode.Web-*.zip > checksum.txt
+
+      - name: Upload checksum.txt
+        working-directory: assets
+        run: gh release upload "$TAG" checksum.txt --repo "$GITHUB_REPOSITORY" --clobber
